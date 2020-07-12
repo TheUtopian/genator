@@ -1,3 +1,7 @@
+use std::ops::Range;
+use std::time::Instant;
+use std::fs::File;
+
 type BString = Vec<u8>;
 
 const MAX_COMBINATION: usize = 1 << 20;

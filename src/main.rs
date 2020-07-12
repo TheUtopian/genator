@@ -1,15 +1,7 @@
-use std::env;
-use std::ops::{RangeInclusive, Range};
-use std::cmp::Ordering;
-use std::str::from_utf8_unchecked as from_ascii;
-use std::time::{Duration, Instant};
-use std::fs::File;
-use std::io::prelude::*;
-
 use genator::Parser;
 
 fn main() {
-	let args: Vec<String> = env::args().collect();
+	let args: Vec<String> = std::env::args().collect();
 
 	if args.len() < 2 || args[1].is_empty() || !args[1].is_ascii() {
 		panic!("Write something and don't forget about quotes please.");
