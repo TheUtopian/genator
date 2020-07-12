@@ -1,5 +1,5 @@
 [package]
-name = "mprust"
+name = "genator"
 version = "0.1.0"
 authors = ["Utopia"]
 edition = "2018"

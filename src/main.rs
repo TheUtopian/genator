@@ -8,31 +8,30 @@ use std::io::prelude::*;
 
 use genator::Parser;
 
-const MAX_COMBINATION: usize = 1 << 31;
-
 fn main() {
 	let args: Vec<String> = env::args().collect();
 
-	if args.len() < 2 || args[1].is_empty() || !args[1].is_ansii() {
+	if args.len() < 2 || args[1].is_empty() || !args[1].is_ascii() {
 		panic!("Write something and don't forget about quotes please.");
 	}
 
 	let parser = Parser::new(&args[1]);
-	let mut mp = parser.iter();
+	let mut gen = parser.iter();
+
+	let combs = match gen.combs() {
+		Some(x) => x,
+		None => panic!("Too much combinations!"),
+	};
 
 	let start = Instant::now();
-	if mp.combinations() > MAX_COMBINATION {
-		println!("Too much combinations: {}", mp.combinations());
-		return;
-	}
 
 	loop {
 
-		println!("{} | ", mp.get());
+		println!("{} | ", gen.get());
 
-		if !mp.next() { break; }
+		if !gen.next() { break; }
 	}
 
-	println!("-----------------\nCombinations: {}\n-----------------", mp.combinations());
+	println!("-----------------\nCombinations: {}\n-----------------", combs);
 	println!("-----------------\nElapsed: {}\n-----------------", start.elapsed().as_secs_f64());
 }

@@ -1,6 +1,6 @@
 type BString = Vec<u8>;
 
-const MAX_COMBINATION: usize = 1 << 24;
+const MAX_COMBINATION: usize = 1 << 20;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Token<'a> {
@@ -151,14 +151,18 @@ impl<'a> Iter<'a> {
 		out
 	}
 
-	pub fn combinations(&self) -> usize {
+	pub fn combs(&self) -> Option<usize> {
 		let mut p: usize = 1;
 
 		for x in self.parser.map.iter() {
-			p = p.saturating_mul(x.len());
+			p *= x.len();
+
+			if p > MAX_COMBINATION {
+				return None;
+			}
 		}
 
-		p
+		Some(p)
 	}
 }
 
