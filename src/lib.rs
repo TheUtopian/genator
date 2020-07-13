@@ -124,28 +124,30 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iter<'a> {
+	// FIX: DOSEN'T ITERATE THE LAST ELEMENT
 	pub fn next(&mut self) -> Option<String> {
-		let mut it = 0;
 		let mut out = String::new();
+
+		let mut i = 0;
 		for t in self.parser.template.iter() {
 			if *t == 0 {
-				match self.parser.map[it][self.count[it] as usize] {
+				match self.parser.map[i][self.count[i] as usize] {
 					Ch(x) if x != 0 => { out.push(x as char) },
 					Str(x) => {	out.push_str(x) },
 					_ => {}
 				}
-				it += 1;
+				i += 1;
 			} else {
 				out.push(*t as char);
 			}
 		}
 
-		for (mask, it) in self.parser.map.iter().zip(self.count.iter_mut()) {
-			if *it as usize + 1 < mask.len() {
-				*it += 1;
+		for (mask, i) in self.parser.map.iter().zip(self.count.iter_mut()) {
+			if *i as usize + 1 < mask.len() {
+				*i += 1;
 				return Some(out);
 			}
-			*it = 0;
+			*i = 0;
 		}
 
 		None
