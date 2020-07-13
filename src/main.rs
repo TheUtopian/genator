@@ -1,3 +1,4 @@
+use std::time::Instant;
 use genator::Parser;
 
 fn main() {
@@ -16,14 +17,13 @@ fn main() {
 	};
 
 	let start = Instant::now();
+	let mut i = 0;
 
-	loop {
-
-		println!("{} | ", gen.get());
-
-		if !gen.next() { break; }
+	while let Some(result) = gen.next() {
+		println!("{}) {} | ", i, result);
+		i += 1;
 	}
 
 	println!("-----------------\nCombinations: {}\n-----------------", combs);
-	println!("-----------------\nElapsed: {}\n-----------------", start.elapsed().as_secs_f64());
+	println!("-----------------\nElapsed: {}\n-----------------", start.elapsed().as_millis());
 }

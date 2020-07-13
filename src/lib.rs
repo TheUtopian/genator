@@ -1,5 +1,4 @@
 use std::ops::Range;
-use std::time::Instant;
 use std::fs::File;
 
 type BString = Vec<u8>;
@@ -125,18 +124,7 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iter<'a> {
-	pub fn next(&mut self) -> bool {
-		for (mask, it) in self.parser.map.iter().zip(self.count.iter_mut()) {
-			if *it as usize + 1 < mask.len() {
-				*it += 1;
-				return true;
-			}
-			*it = 0;
-		}
-		false
-	}
-
-	pub fn get(&self) -> String {
+	pub fn next(&mut self) -> Option<String> {
 		let mut it = 0;
 		let mut out = String::new();
 		for t in self.parser.template.iter() {
@@ -152,11 +140,19 @@ impl<'a> Iter<'a> {
 			}
 		}
 
-		out
+		for (mask, it) in self.parser.map.iter().zip(self.count.iter_mut()) {
+			if *it as usize + 1 < mask.len() {
+				*it += 1;
+				return Some(out);
+			}
+			*it = 0;
+		}
+
+		None
 	}
 
 	pub fn combs(&self) -> Option<usize> {
-		let mut p: usize = 1;
+		let mut p = 1;
 
 		for x in self.parser.map.iter() {
 			p *= x.len();
