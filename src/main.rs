@@ -20,7 +20,7 @@ fn main() {
 	let mut i = 0;
 
 	while let Some(result) = gen.next() {
-		println!("{}) {} | ", i, result);
+		println!("| {} | {}", result, i);
 		i += 1;
 	}
 

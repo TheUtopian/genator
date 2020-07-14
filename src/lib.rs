@@ -9,6 +9,7 @@ const MAX_COMBINATION: usize = 1 << 20;
 enum Token<'a> {
 	Ch(u8),
 	Str(&'a str),
+	Out(&'a str),
 }
 
 use Token::{Ch, Str};
@@ -16,12 +17,11 @@ use Token::{Ch, Str};
 #[derive(Debug)]
 pub struct Parser<'a> {
 	map: Vec<Vec<Token<'a>>>,
-	template: BString
 }
 
 impl<'a> Parser<'a> {
 	pub fn new(data: &'a str) -> Self {
-		let (tokens, template) = Parser::tokenize(data);
+		let tokens = Self::tokenize(data);
 		let mut map: Vec<Vec<Token<'a>>> = Vec::with_capacity(tokens.len());
 
 		for (token, alpha) in tokens.iter() {
@@ -56,64 +56,68 @@ impl<'a> Parser<'a> {
 				for t in token[1..].split('|') {
 					piece.push(Str(t));
 				}
+			} else {
+				piece.push(Str(token));
 			}
 
 			map.push(piece);
 		}
 
-		Self { map, template }
+		Self { map }
 	}
 
 	pub fn iter(&self) -> Iter {
 		Iter { parser: self, count: vec![0; self.map.len()] }
 	}
 
-	fn tokenize(data: &'a str) -> (Vec<(&'a str, bool)>, BString) {
-		let mut template = Vec::new();
+	fn tokenize(data: &'a str) -> Vec<(&'a str, bool)> {
 		let mut tokens: Vec<(&str, bool)> = Vec::new();
 
 		let mut it = 0;
 		while it < data.len() {
 			let shift = &data[it..];
 
-			match data.as_bytes()[it] {
+			match shift.as_bytes()[0] {
 				b'[' => if let Some(end_b) = shift.find(']') {
-					if let Some(end) = shift[0..end_b].find(';') {
+					if let Some(end) = shift[..end_b].find(';') {
 						let rng = range::from_str(&shift[(end + 1)..end_b]);
-						let shift2 = &shift[0..end];
+						let shift2 = &shift[..end];
 
 						if rng.end == 0 || rng.start > rng.end {
-							template.push(0);
 							tokens.push((shift2, true));
 						} else {
 							for _ in 0..rng.start {
-								template.push(0);
 								tokens.push((shift2, false));
 							}
 							for _ in rng {
-								template.push(0);
 								tokens.push((shift2, true));
 							}
 						}
 					} else {
-						template.push(0);
-						tokens.push((&shift[0..end_b], false));
+						tokens.push((&shift[..end_b], false));
 					}
 
 					it += end_b;
 				},
 				b'(' => if let Some(end) = shift.find(')') {
-					template.push(0);
-					tokens.push((&shift[0..end], !shift[0..end].contains('|')));
+					tokens.push((&shift[..end], !shift[..end].contains('|')));
 					it += end;
 				},
-				_ => template.push(data.as_bytes()[it]),
+				_ => {
+					if let Some(end) = shift.find(|x| x == '[' || x == '(') {
+						tokens.push((&shift[..end], false));
+						it += end - 1;
+					} else {
+						tokens.push((shift, false));
+						it = data.len();
+					}
+				},
 			}
 
 			it += 1;
 		}
 
-		(tokens, template)
+		tokens
 	}
 }
 
@@ -128,17 +132,11 @@ impl<'a> Iter<'a> {
 	pub fn next(&mut self) -> Option<String> {
 		let mut out = String::new();
 
-		let mut i = 0;
-		for t in self.parser.template.iter() {
-			if *t == 0 {
-				match self.parser.map[i][self.count[i] as usize] {
-					Ch(x) if x != 0 => { out.push(x as char) },
-					Str(x) => {	out.push_str(x) },
-					_ => {}
-				}
-				i += 1;
-			} else {
-				out.push(*t as char);
+		for i in 0..self.parser.map.len() {
+			match self.parser.map[i][self.count[i] as usize] {
+				Ch(x) if x != 0 => { out.push(x as char) },
+				Str(x) => {	out.push_str(x) },
+				_ => {}
 			}
 		}
 
