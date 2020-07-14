@@ -7,30 +7,38 @@ const MAX_COMBINATION: usize = 1 << 20;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Token<'a> {
-	Ch(u8),
-	Str(&'a str),
+	Ch(BString),
+	Str(Vec<&'a str>),
 	Out(&'a str),
 }
 
-use Token::{Ch, Str};
+impl Token<'_> {
+	fn len(&self) -> usize {
+		match self {
+			Ch(x) => x.len(),
+			Str(x) => x.len(),
+			Out(x) => 1
+		}
+	}
+}
+
+use Token::{Ch, Str, Out};
 
 #[derive(Debug)]
 pub struct Parser<'a> {
-	map: Vec<Vec<Token<'a>>>,
+	map: Vec<Token<'a>>,
 }
 
 impl<'a> Parser<'a> {
 	pub fn new(data: &'a str) -> Self {
 		let tokens = Self::tokenize(data);
-		let mut map: Vec<Vec<Token<'a>>> = Vec::with_capacity(tokens.len());
+		let mut map: Vec<Token<'a>> = Vec::with_capacity(tokens.len());
 
 		for (token, alpha) in tokens.iter() {
 			let bracket = token.as_bytes()[0];
-			let mut piece = Vec::new();
-
-			if *alpha { piece.push(Ch(0)); }
 
 			if bracket == b'[' {
+				let mut piece = Vec::new();
 				let data = token[1..].as_bytes();
 				
 				let mut i = 0;
@@ -38,29 +46,37 @@ impl<'a> Parser<'a> {
 					if data[i] == b'-' && i > 0 && i < data.len() - 1 {
 						if data[i - 1].is_ascii_alphanumeric() && data[i + 1].is_ascii_alphanumeric() {
 							for t in data[i - 1]..=data[i + 1] {
-								if !piece.contains(&Ch(t)) {
-									piece.push(Ch(t));
+								if !piece.contains(&t) {
+									piece.push(t);
 								}
 							}
 							i += 1;
 						}
 					} else if data.get(i + 1).copied().unwrap_or(0) != b'-' {
-						if !piece.contains(&Ch(data[i])) {
-							piece.push(Ch(data[i]));
+						if !piece.contains(&data[i]) {
+							piece.push(data[i]);
 						}
 					}
 
 					i += 1;
 				}
-			} else if bracket == b'(' {
-				for t in token[1..].split('|') {
-					piece.push(Str(t));
-				}
-			} else {
-				piece.push(Str(token));
-			}
 
-			map.push(piece);
+				if *alpha { piece.push(0); }
+
+				map.push(Ch(piece));
+			} else if bracket == b'(' {
+				let mut piece = Vec::new();
+
+				for t in token[1..].split('|') {
+					piece.push(t);
+				}
+
+				if *alpha { piece.push(""); }
+
+				map.push(Str(piece));
+			} else {
+				map.push(Out(token));
+			}
 		}
 
 		Self { map }
@@ -132,11 +148,11 @@ impl<'a> Iter<'a> {
 	pub fn next(&mut self) -> Option<String> {
 		let mut out = String::new();
 
-		for i in 0..self.parser.map.len() {
-			match self.parser.map[i][self.count[i] as usize] {
-				Ch(x) if x != 0 => { out.push(x as char) },
-				Str(x) => {	out.push_str(x) },
-				_ => {}
+		for (mask, i) in self.parser.map.iter().zip(self.count.iter()) {
+			match mask {
+				Ch(x) => if x[*i as usize] != 0 { out.push(x[*i as usize] as char) },
+				Str(x) => {	out.push_str(x[*i as usize]) },
+				Out(x) => { out.push_str(x) }
 			}
 		}
 
