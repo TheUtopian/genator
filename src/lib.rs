@@ -65,11 +65,7 @@ impl<'a> Parser<'a> {
 
 				map.push(Ch(piece));
 			} else if bracket == b'(' {
-				let mut piece = Vec::new();
-
-				for t in token[1..].split('|') {
-					piece.push(t);
-				}
+				let mut piece: Vec<&str> = token[1..].split('|').collect();
 
 				if *alpha { piece.push(""); }
 
@@ -96,18 +92,27 @@ impl<'a> Parser<'a> {
 			match shift.as_bytes()[0] {
 				b'[' => if let Some(end_b) = shift.find(']') {
 					if let Some(end) = shift[..end_b].find(';') {
-						let rng = range::from_str(&shift[(end + 1)..end_b]);
-						let shift2 = &shift[..end];
+						match range::from_str(&shift[(end + 1)..end_b]) {
+							Ok(rng) => {
+								for _ in 0..rng.start {
+									tokens.push((&shift[..end], false));
+								}
 
-						if rng.end == 0 || rng.start > rng.end {
-							tokens.push((shift2, true));
-						} else {
-							for _ in 0..rng.start {
-								tokens.push((shift2, false));
-							}
-							for _ in rng {
-								tokens.push((shift2, true));
-							}
+								for _ in rng {
+									tokens.push((&shift[..end], true));
+								}
+							},
+							Err(_) => {
+								let num: u8 = &shift[(end + 1)..end_b].parse().unwrap_or(1);
+
+								if num == 0 {
+									tokens.push((&shift[..end], true));
+								} else {
+									for _ in 0..num {
+										tokens.push((&shift[..end], false));
+									}
+								}
+							},
 						}
 					} else {
 						tokens.push((&shift[..end_b], false));
@@ -185,22 +190,16 @@ impl<'a> Iter<'a> {
 mod range {
 	use std::ops::Range;
 
-	pub fn from_str(s: &str) -> Range<u8> {
-		let mut iter = s.trim().split('-');
-
-		if let Some(n) = iter.next() {
-			if let Ok(start) = n.parse::<u8>() {
-				if let Some(n) = iter.next() {
-					if let Ok(end) = n.parse::<u8>() {
-						return Range { start, end };
-					}
+	pub fn from_str(s: &str) -> Result<Range<u8>, ()> {
+		if let Some(separator) = s.find('-') {
+			if let Ok(start) = s[..separator].trim().parse::<u8>() {
+				if let Ok(end) = s[(separator + 1)..].parse::<u8>() {
+					return Ok(Range { start, end });
 				}
-
-				return Range { start, end: start };
 			}
 		}
 
-		Range { start: 1, end: 1 }
+		Err(())
 	}
 }
 
