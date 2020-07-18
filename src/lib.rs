@@ -103,7 +103,7 @@ impl<'a> Parser<'a> {
 								}
 							},
 							Err(_) => {
-								let num: u8 = &shift[(end + 1)..end_b].parse().unwrap_or(1);
+								let num: u8 = shift[(end + 1)..end_b].parse().unwrap_or(1);
 
 								if num == 0 {
 									tokens.push((&shift[..end], true));
