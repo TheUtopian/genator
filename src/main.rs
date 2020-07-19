@@ -22,6 +22,6 @@ fn main() {
 		println!("| {} | {}", result, i);
 	}
 
+	println!("-----------------\nElapsed: {}ms\n-----------------", start.elapsed().as_millis());
 	println!("-----------------\nCombinations: {}\n-----------------", combs);
-	println!("-----------------\nElapsed: {}\n-----------------", start.elapsed().as_millis());
 }

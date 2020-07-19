@@ -1,13 +1,11 @@
 use std::ops::Range;
 use std::fs::File;
 
-type BString = Vec<u8>;
-
 const MAX_COMBINATION: usize = 1 << 20;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Token<'a> {
-	Ch(BString),
+	Ch(Vec<u8>),
 	Str(Vec<&'a str>),
 	Out(&'a str),
 }
@@ -145,10 +143,10 @@ impl<'a> Parser<'a> {
 #[derive(Debug)]
 pub struct Iter<'a> {
 	parser: &'a Parser<'a>,
-	count: BString
+	count: Vec<u8>
 }
 
-impl<'a> Iter<'a> {
+impl Iter<'_> {
 	pub fn combs(&self) -> Option<usize> {
 		let mut p = 1;
 
@@ -169,10 +167,8 @@ impl Iterator for Iter<'_> {
 	type Item = String;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		if let Some(last) = self.count.last() {
-			if *last == u8::MAX {
-				return None;
-			}
+		if self.count[0] == u8::MAX {
+			return None;
 		}
 
 		let mut out = String::new();
@@ -185,22 +181,17 @@ impl Iterator for Iter<'_> {
 			}
 		}
 
-		if self.parser.map.iter().zip(self.count.iter()).all(|(mask, &i)| mask.len() == (i as usize + 1)) {
-			if let Some(last) = self.count.last_mut() {
-				*last = u8::MAX;
-			}
-			return Some(out);
-		}
-
 		for (mask, i) in self.parser.map.iter().zip(self.count.iter_mut()) {
-			if *i as usize + 1 < mask.len() {
+			if *i + 1 < mask.len() as u8 {
 				*i += 1;
 				return Some(out);
 			}
 			*i = 0;
 		}
 
-		None
+		self.count[0] = u8::MAX;
+
+		Some(out)
 	}
 }
 
