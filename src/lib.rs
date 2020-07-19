@@ -149,29 +149,6 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iter<'a> {
-	// FIX: DOSEN'T ITERATE THE LAST ELEMENT
-	pub fn next(&mut self) -> Option<String> {
-		let mut out = String::new();
-
-		for (mask, i) in self.parser.map.iter().zip(self.count.iter()) {
-			match mask {
-				Ch(x) => if x[*i as usize] != 0 { out.push(x[*i as usize] as char) },
-				Str(x) => {	out.push_str(x[*i as usize]) },
-				Out(x) => { out.push_str(x) }
-			}
-		}
-
-		for (mask, i) in self.parser.map.iter().zip(self.count.iter_mut()) {
-			if *i as usize + 1 < mask.len() {
-				*i += 1;
-				return Some(out);
-			}
-			*i = 0;
-		}
-
-		None
-	}
-
 	pub fn combs(&self) -> Option<usize> {
 		let mut p = 1;
 
@@ -184,6 +161,46 @@ impl<'a> Iter<'a> {
 		}
 
 		Some(p)
+	}
+}
+
+// TODO: WORK but too ineffective!
+impl Iterator for Iter<'_> {
+	type Item = String;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		if let Some(last) = self.count.last() {
+			if *last == u8::MAX {
+				return None;
+			}
+		}
+
+		let mut out = String::new();
+
+		for (mask, i) in self.parser.map.iter().zip(self.count.iter()) {
+			match mask {
+				Ch(x) => if x[*i as usize] != 0 { out.push(x[*i as usize] as char) },
+				Str(x) => {	out.push_str(x[*i as usize]) },
+				Out(x) => { out.push_str(x) }
+			}
+		}
+
+		if self.parser.map.iter().zip(self.count.iter()).all(|(mask, &i)| mask.len() == (i as usize + 1)) {
+			if let Some(last) = self.count.last_mut() {
+				*last = u8::MAX;
+			}
+			return Some(out);
+		}
+
+		for (mask, i) in self.parser.map.iter().zip(self.count.iter_mut()) {
+			if *i as usize + 1 < mask.len() {
+				*i += 1;
+				return Some(out);
+			}
+			*i = 0;
+		}
+
+		None
 	}
 }
 

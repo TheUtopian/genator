@@ -17,11 +17,9 @@ fn main() {
 	};
 
 	let start = Instant::now();
-	let mut i = 0;
 
-	while let Some(result) = gen.next() {
+	for (i, result) in gen.enumerate() {
 		println!("| {} | {}", result, i);
-		i += 1;
 	}
 
 	println!("-----------------\nCombinations: {}\n-----------------", combs);
