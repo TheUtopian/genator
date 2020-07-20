@@ -8,6 +8,7 @@ enum Token<'a> {
 	Ch(Vec<u8>),
 	Str(Vec<&'a str>),
 	Out(&'a str),
+	Var(usize),
 }
 
 impl Token<'_> {
@@ -15,12 +16,13 @@ impl Token<'_> {
 		match self {
 			Ch(x) => x.len(),
 			Str(x) => x.len(),
-			Out(x) => 1
+			Out(_) => 1,
+			Var(_) => 0,
 		}
 	}
 }
 
-use Token::{Ch, Str, Out};
+use Token::{Ch, Str, Out, Var};
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -68,6 +70,11 @@ impl<'a> Parser<'a> {
 				if *alpha { piece.push(""); }
 
 				map.push(Str(piece));
+			} else if bracket == b'{' {
+				let num = (token.as_bytes()[1] - b'0') as usize;
+				if num >= 0 && num < map.len() {
+					map.push(Var(num));
+				}
 			} else {
 				map.push(Out(token));
 			}
@@ -122,8 +129,12 @@ impl<'a> Parser<'a> {
 					tokens.push((&shift[..end], !shift[..end].contains('|')));
 					it += end;
 				},
+				b'{' => if let Some(end) = shift.find('}') {
+					tokens.push((&shift[..end], false));
+					it += end;
+				},
 				_ => {
-					if let Some(end) = shift.find(|x| x == '[' || x == '(') {
+					if let Some(end) = shift.find(|x| x == '[' || x == '(' || x == '{') {
 						tokens.push((&shift[..end], false));
 						it += end - 1;
 					} else {
@@ -162,7 +173,6 @@ impl Iter<'_> {
 	}
 }
 
-// TODO: WORK but too ineffective!
 impl Iterator for Iter<'_> {
 	type Item = String;
 
@@ -177,7 +187,14 @@ impl Iterator for Iter<'_> {
 			match mask {
 				Ch(x) => if x[*i as usize] != 0 { out.push(x[*i as usize] as char) },
 				Str(x) => {	out.push_str(x[*i as usize]) },
-				Out(x) => { out.push_str(x) }
+				Out(x) => { out.push_str(x) },
+				Var(n) => {
+					match &self.parser.map[*n] {
+						Ch(x) => if x[self.count[*n] as usize] != 0 { out.push(x[self.count[*n] as usize] as char) },
+						Str(x) => {	out.push_str(x[self.count[*n] as usize]) },
+						_ => {},
+					}
+				}
 			}
 		}
 
