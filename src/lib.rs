@@ -161,6 +161,27 @@ pub struct Iter<'a> {
 }
 
 impl Iter<'_> {
+	pub fn get(&self) -> String {
+		let mut out = String::new();
+
+		for (mask, i) in self.parser.map.iter().zip(self.count.iter()) {
+			match mask {
+				Ch(x) => if x[i.start as usize] != 0 { out.push(x[i.start as usize] as char) },
+				Str(x) => {	out.push_str(x[i.start as usize]) },
+				Out(x) => { out.push_str(x) },
+				Var(n) => {
+					match &self.parser.map[*n] {
+						Ch(x) => if x[self.count[*n].start as usize] != 0 { out.push(x[self.count[*n].start as usize] as char) },
+						Str(x) => {	out.push_str(x[self.count[*n].start as usize]) },
+						_ => {},
+					}
+				}
+			}
+		}
+
+		out
+	}
+
 	pub fn combs(&self) -> Option<usize> {
 		let mut p = 1;
 
@@ -184,22 +205,7 @@ impl Iterator for Iter<'_> {
 			return None;
 		}
 
-		let mut out = String::new();
-
-		for (mask, i) in self.parser.map.iter().zip(self.count.iter()) {
-			match mask {
-				Ch(x) => if x[i.start as usize] != 0 { out.push(x[i.start as usize] as char) },
-				Str(x) => {	out.push_str(x[i.start as usize]) },
-				Out(x) => { out.push_str(x) },
-				Var(n) => {
-					match &self.parser.map[*n] {
-						Ch(x) => if x[self.count[*n].start as usize] != 0 { out.push(x[self.count[*n].start as usize] as char) },
-						Str(x) => {	out.push_str(x[self.count[*n].start as usize]) },
-						_ => {},
-					}
-				}
-			}
-		}
+		let out = self.get();
 
 		for Range { start, end } in self.count.iter_mut() {
 			if *start + 1 < *end {
@@ -228,19 +234,5 @@ mod range {
 		}
 
 		Err(())
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[test]
-	fn range_test() {
-	}
-
-	#[test]
-	fn parser_a() {
-		
 	}
 }
