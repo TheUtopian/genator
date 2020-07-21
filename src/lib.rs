@@ -84,7 +84,7 @@ impl<'a> Parser<'a> {
 	}
 
 	pub fn iter(&self) -> Iter {
-		Iter { parser: self, count: vec![0; self.map.len()] }
+		Iter { parser: self, count: self.map.iter().map(|x| Range { start: 0u8, end: x.len() as u8 }).collect() }
 	}
 
 	fn tokenize(data: &'a str) -> Vec<(&'a str, bool)> {
@@ -96,7 +96,8 @@ impl<'a> Parser<'a> {
 
 			match shift.as_bytes()[0] {
 				b'[' => if let Some(end_b) = shift.find(']') {
-					if let Some(end) = shift[..end_b].find(';') {
+					if end_b == 1 {
+					} else if let Some(end) = shift[..end_b].find(';') {
 						match range::from_str(&shift[(end + 1)..end_b]) {
 							Ok(rng) => {
 								for _ in 0..rng.start {
@@ -126,7 +127,9 @@ impl<'a> Parser<'a> {
 					it += end_b;
 				},
 				b'(' => if let Some(end) = shift.find(')') {
-					tokens.push((&shift[..end], !shift[..end].contains('|')));
+					if end > 1 {
+						tokens.push((&shift[..end], !shift[..end].contains('|')));
+					}
 					it += end;
 				},
 				b'{' => if let Some(end) = shift.find('}') {
@@ -154,7 +157,7 @@ impl<'a> Parser<'a> {
 #[derive(Debug)]
 pub struct Iter<'a> {
 	parser: &'a Parser<'a>,
-	count: Vec<u8>
+	count: Vec<Range<u8>>
 }
 
 impl Iter<'_> {
@@ -177,7 +180,7 @@ impl Iterator for Iter<'_> {
 	type Item = String;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		if self.count[0] == u8::MAX {
+		if self.count[0].start == u8::MAX {
 			return None;
 		}
 
@@ -185,28 +188,28 @@ impl Iterator for Iter<'_> {
 
 		for (mask, i) in self.parser.map.iter().zip(self.count.iter()) {
 			match mask {
-				Ch(x) => if x[*i as usize] != 0 { out.push(x[*i as usize] as char) },
-				Str(x) => {	out.push_str(x[*i as usize]) },
+				Ch(x) => if x[i.start as usize] != 0 { out.push(x[i.start as usize] as char) },
+				Str(x) => {	out.push_str(x[i.start as usize]) },
 				Out(x) => { out.push_str(x) },
 				Var(n) => {
 					match &self.parser.map[*n] {
-						Ch(x) => if x[self.count[*n] as usize] != 0 { out.push(x[self.count[*n] as usize] as char) },
-						Str(x) => {	out.push_str(x[self.count[*n] as usize]) },
+						Ch(x) => if x[self.count[*n].start as usize] != 0 { out.push(x[self.count[*n].start as usize] as char) },
+						Str(x) => {	out.push_str(x[self.count[*n].start as usize]) },
 						_ => {},
 					}
 				}
 			}
 		}
 
-		for (mask, i) in self.parser.map.iter().zip(self.count.iter_mut()) {
-			if *i + 1 < mask.len() as u8 {
-				*i += 1;
+		for Range { start, end } in self.count.iter_mut() {
+			if *start + 1 < *end {
+				*start += 1;
 				return Some(out);
 			}
-			*i = 0;
+			*start = 0;
 		}
 
-		self.count[0] = u8::MAX;
+		self.count[0].start = u8::MAX;
 
 		Some(out)
 	}
