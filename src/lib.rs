@@ -11,30 +11,21 @@ enum Token<'a> {
 	Var(usize),
 }
 
-impl Token<'_> {
-	fn len(&self) -> usize {
-		match self {
-			Ch(x) => x.len(),
-			Str(x) => x.len(),
-			Out(_) => 1,
-			Var(_) => 0,
-		}
-	}
-}
-
 use Token::{Ch, Str, Out, Var};
 
 #[derive(Debug)]
 pub struct Parser<'a> {
 	map: Vec<Token<'a>>,
+	keys: Vec<u8>
 }
 
 impl<'a> Parser<'a> {
 	pub fn new(data: &'a str) -> Self {
 		let tokens = Self::tokenize(data);
 		let mut map: Vec<Token<'a>> = Vec::with_capacity(tokens.len());
+		let mut keys = Vec::new();
 
-		for (token, alpha) in tokens.iter() {
+		for (k, (token, alpha)) in tokens.iter().enumerate() {
 			let bracket = token.as_bytes()[0];
 
 			if bracket == b'[' {
@@ -61,30 +52,42 @@ impl<'a> Parser<'a> {
 					i += 1;
 				}
 
-				if *alpha { piece.push(0); }
+				if *alpha { piece.push(Default::default()); }
 
 				map.push(Ch(piece));
+				keys.push(k as u8);
 			} else if bracket == b'(' {
 				let mut piece: Vec<&str> = token[1..].split('|').collect();
 
-				if *alpha { piece.push(""); }
+				if *alpha { piece.push(Default::default()); }
 
 				map.push(Str(piece));
+				keys.push(k as u8);
 			} else if bracket == b'{' {
-				let num = (token.as_bytes()[1] - b'0') as usize;
-				if num >= 0 && num < map.len() {
-					map.push(Var(num));
+				if token.as_bytes()[1].is_ascii_digit() {
+					let num = (token.as_bytes()[1] - b'0') as usize;
+					if num < keys.len() {
+						map.push(Var(num));
+					}
 				}
 			} else {
 				map.push(Out(token));
 			}
 		}
 
-		Self { map }
+		Self { map, keys }
 	}
 
 	pub fn iter(&self) -> Iter {
-		Iter { parser: self, count: self.map.iter().map(|x| Range { start: 0u8, end: x.len() as u8 }).collect() }
+		let mut count = Vec::with_capacity(self.keys.len());
+		for &k in self.keys.iter() {
+			match &self.map[k as usize] {
+				Ch(x) => { count.push(Range{ start: 0, end: x.len() as u8 }) },
+				Str(x) => { count.push(Range{ start: 0, end: x.len() as u8 }) },
+				_ => {}
+			}
+		}
+		Iter { parser: self, count }
 	}
 
 	fn tokenize(data: &'a str) -> Vec<(&'a str, bool)> {
@@ -133,7 +136,9 @@ impl<'a> Parser<'a> {
 					it += end;
 				},
 				b'{' => if let Some(end) = shift.find('}') {
-					tokens.push((&shift[..end], false));
+					if end > 1 {
+						tokens.push((&shift[..end], false));
+					}
 					it += end;
 				},
 				_ => {
@@ -154,7 +159,7 @@ impl<'a> Parser<'a> {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Iter<'a> {
 	parser: &'a Parser<'a>,
 	count: Vec<Range<u8>>
@@ -163,19 +168,27 @@ pub struct Iter<'a> {
 impl Iter<'_> {
 	pub fn get(&self) -> String {
 		let mut out = String::new();
+		let mut i = 0;
 
-		for (mask, i) in self.parser.map.iter().zip(self.count.iter()) {
+		for mask in self.parser.map.iter() {
 			match mask {
-				Ch(x) => if x[i.start as usize] != 0 { out.push(x[i.start as usize] as char) },
-				Str(x) => {	out.push_str(x[i.start as usize]) },
-				Out(x) => { out.push_str(x) },
+				Ch(x) => {
+					out.push(x[self.count[i].start as usize] as char);
+					i += 1;
+				},
+				Str(x) => {
+					out.push_str(x[self.count[i].start as usize]);
+					i += 1;
+				},
 				Var(n) => {
-					match &self.parser.map[*n] {
-						Ch(x) => if x[self.count[*n].start as usize] != 0 { out.push(x[self.count[*n].start as usize] as char) },
-						Str(x) => {	out.push_str(x[self.count[*n].start as usize]) },
+					let j = self.count[*n].start as usize;
+					match &self.parser.map[self.parser.keys[*n] as usize] {
+						Ch(x) => { out.push(x[j] as char) },
+						Str(x) => {	out.push_str(x[j]) },
 						_ => {},
 					}
-				}
+				},
+				Out(x) => { out.push_str(x) },
 			}
 		}
 
@@ -186,7 +199,11 @@ impl Iter<'_> {
 		let mut p = 1;
 
 		for x in self.parser.map.iter() {
-			p *= x.len();
+			match x {
+				Ch(x) => p *= x.len(),
+				Str(x) => p *= x.len(),
+				_ => {}
+			}
 
 			if p > MAX_COMBINATION {
 				return None;
@@ -201,7 +218,11 @@ impl Iterator for Iter<'_> {
 	type Item = String;
 
 	fn next(&mut self) -> Option<Self::Item> {
+		if self.count.len() == 0 {
+			return None;
+		}
 		if self.count[0].start == u8::MAX {
+			self.count[0].start = 0;
 			return None;
 		}
 
