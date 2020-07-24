@@ -34,7 +34,7 @@ impl<'a> Parser<'a> {
 				
 				let mut i = 0;
 				while i < data.len() {
-					if data[i] == b'-' && i > 0 && i < data.len() - 1 {
+					if data[i] == b'-' && i > 0 && (i + 1) < data.len() {
 						if data[i - 1].is_ascii_alphanumeric() && data[i + 1].is_ascii_alphanumeric() {
 							for t in data[i - 1]..=data[i + 1] {
 								if !piece.contains(&t) {
@@ -54,15 +54,15 @@ impl<'a> Parser<'a> {
 
 				if *alpha { piece.push(Default::default()); }
 
-				map.push(Ch(piece));
 				keys.push(k as u8);
+				map.push(Ch(piece));
 			} else if bracket == b'(' {
 				let mut piece: Vec<&str> = token[1..].split('|').collect();
 
 				if *alpha { piece.push(Default::default()); }
 
-				map.push(Str(piece));
 				keys.push(k as u8);
+				map.push(Str(piece));
 			} else if bracket == b'{' {
 				if token.as_bytes()[1].is_ascii_digit() {
 					let num = (token.as_bytes()[1] - b'0') as usize;
@@ -93,9 +93,9 @@ impl<'a> Parser<'a> {
 	fn tokenize(data: &'a str) -> Vec<(&'a str, bool)> {
 		let mut tokens: Vec<(&str, bool)> = Vec::new();
 
-		let mut it = 0;
-		while it < data.len() {
-			let shift = &data[it..];
+		let mut i = 0;
+		while i < data.len() {
+			let shift = &data[i..];
 
 			match shift.as_bytes()[0] {
 				b'[' => if let Some(end_b) = shift.find(']') {
@@ -127,32 +127,32 @@ impl<'a> Parser<'a> {
 						tokens.push((&shift[..end_b], false));
 					}
 
-					it += end_b;
+					i += end_b;
 				},
 				b'(' => if let Some(end) = shift.find(')') {
 					if end > 1 {
-						tokens.push((&shift[..end], !shift[..end].contains('|')));
+						tokens.push((&shift[..end], !shift[..end].contains(',')));
 					}
-					it += end;
+					i += end;
 				},
 				b'{' => if let Some(end) = shift.find('}') {
 					if end > 1 {
 						tokens.push((&shift[..end], false));
 					}
-					it += end;
+					i += end;
 				},
 				_ => {
 					if let Some(end) = shift.find(|x| x == '[' || x == '(' || x == '{') {
 						tokens.push((&shift[..end], false));
-						it += end - 1;
+						i += end - 1;
 					} else {
 						tokens.push((shift, false));
-						it = data.len();
+						break;
 					}
 				},
 			}
 
-			it += 1;
+			i += 1;
 		}
 
 		tokens
