@@ -1,7 +1,7 @@
 use std::ops::Range;
 use std::fs::File;
 
-const MAX_COMBINATION: usize = 1 << 20;
+const MAX_COMBINATION: usize = 1 << 30;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Token<'a> {
