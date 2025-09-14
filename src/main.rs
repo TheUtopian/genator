@@ -1,17 +1,13 @@
 use std::time::Instant;
-use genator::Parser;
+use genator::{Parser, request};
 
 fn main() {
-	let args: Vec<String> = std::env::args().collect();
-
-	if args.len() < 2 || args[1].is_empty() || !args[1].is_ascii() {
-		panic!("Write something and don't forget about quotes please.");
-	}
+	let req = request(std::env::args()).unwrap();
 
 	let init = Instant::now();
 
-	let parser = Parser::new(&args[1]);
-	let mut gen = parser.iter();
+	let parser = Parser::new(&req);
+	let gen = parser.iter();
 
 	let parsing_time = init.elapsed().as_micros();
 
@@ -20,13 +16,17 @@ fn main() {
 		None => panic!("Too much combinations!"),
 	};
 
+	let combs_w = (combs as f32).log10().floor() as usize + 1;
+
 	let start = Instant::now();
 
 	for (i, result) in gen.enumerate() {
-		println!("| {} | {}", result, i);
+		println!("{:0combs_w$} | {result}", i);
 	}
+	
+	let elapsed = start.elapsed().as_millis();
 
-	println!("-----------------\nParsing: {}µs\n-----------------", parsing_time);
-	println!("-----------------\nElapsed: {}ms\n-----------------", start.elapsed().as_millis());
-	println!("-----------------\nCombinations: {}\n-----------------", combs);
+	println!("-----------------\nParsing: {parsing_time}µs\n-----------------");
+	println!("-----------------\nElapsed: {elapsed}ms\n-----------------");
+	println!("-----------------\nCombinations: {combs}\n-----------------");
 }

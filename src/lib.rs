@@ -1,17 +1,28 @@
 use std::ops::Range;
-use std::fs::File;
 
 const MAX_COMBINATION: usize = 1 << 30;
+
+
+trait Combinator {
+	fn combinations(&self) -> Option<u32>;
+}
+
+impl Iterator for Box<dyn Combinator> {
+	type Item = String;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		None
+	}
+}
 
 #[derive(Debug, Clone, PartialEq)]
 enum Token<'a> {
 	Ch(Vec<u8>),
 	Str(Vec<&'a str>),
 	Out(&'a str),
-	Var(usize),
 }
 
-use Token::{Ch, Str, Out, Var};
+use Token::*;
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -25,7 +36,7 @@ impl<'a> Parser<'a> {
 		let mut map: Vec<Token<'a>> = Vec::with_capacity(tokens.len());
 		let mut keys = Vec::new();
 
-		for (k, (token, alpha)) in tokens.iter().enumerate() {
+		for (k, token) in tokens.iter().enumerate() {
 			let bracket = token.as_bytes()[0];
 
 			if bracket == b'[' {
@@ -52,24 +63,21 @@ impl<'a> Parser<'a> {
 					i += 1;
 				}
 
-				if *alpha { piece.push(Default::default()); }
+				if token.is_empty() {
+					piece.push(0);
+				}
 
 				keys.push(k as u8);
 				map.push(Ch(piece));
 			} else if bracket == b'(' {
 				let mut piece: Vec<&str> = token[1..].split('|').collect();
 
-				if *alpha { piece.push(Default::default()); }
+				if token.is_empty() {
+					piece.push(token);
+				}
 
 				keys.push(k as u8);
 				map.push(Str(piece));
-			} else if bracket == b'{' {
-				if token.as_bytes()[1].is_ascii_digit() {
-					let num = (token.as_bytes()[1] - b'0') as usize;
-					if num < keys.len() {
-						map.push(Var(num));
-					}
-				}
 			} else {
 				map.push(Out(token));
 			}
@@ -90,8 +98,8 @@ impl<'a> Parser<'a> {
 		Iter { parser: self, count }
 	}
 
-	fn tokenize(data: &'a str) -> Vec<(&'a str, bool)> {
-		let mut tokens: Vec<(&str, bool)> = Vec::new();
+	fn tokenize(data: &'a str) -> Vec<&'a str> {
+		let mut tokens: Vec<&str> = Vec::new();
 
 		let mut i = 0;
 		while i < data.len() {
@@ -104,49 +112,49 @@ impl<'a> Parser<'a> {
 						match range::from_str(&shift[(end + 1)..end_b]) {
 							Ok(rng) => {
 								for _ in 0..rng.start {
-									tokens.push((&shift[..end], false));
+									tokens.push(&shift[..end]);
 								}
 
 								for _ in rng {
-									tokens.push((&shift[..end], true));
+									tokens.push(&shift[..end]);
 								}
 							},
 							Err(_) => {
 								let num: u8 = shift[(end + 1)..end_b].parse().unwrap_or(1);
 
 								if num == 0 {
-									tokens.push((&shift[..end], true));
+									tokens.push(Default::default());
 								} else {
 									for _ in 0..num {
-										tokens.push((&shift[..end], false));
+										tokens.push(&shift[..end]);
 									}
 								}
 							},
 						}
 					} else {
-						tokens.push((&shift[..end_b], false));
+						tokens.push(&shift[..end_b]);
 					}
 
 					i += end_b;
 				},
 				b'(' => if let Some(end) = shift.find(')') {
 					if end > 1 {
-						tokens.push((&shift[..end], !shift[..end].contains(',')));
-					}
-					i += end;
-				},
-				b'{' => if let Some(end) = shift.find('}') {
-					if end > 1 {
-						tokens.push((&shift[..end], false));
+						let slice = &shift[..end];
+
+						if slice.contains(',') {
+							tokens.push(slice);
+						} else {
+							tokens.push(Default::default());
+						}
 					}
 					i += end;
 				},
 				_ => {
-					if let Some(end) = shift.find(|x| x == '[' || x == '(' || x == '{') {
-						tokens.push((&shift[..end], false));
+					if let Some(end) = shift.find(|x| x == '[' || x == '(') {
+						tokens.push(&shift[..end]);
 						i += end - 1;
 					} else {
-						tokens.push((shift, false));
+						tokens.push(shift);
 						break;
 					}
 				},
@@ -156,6 +164,26 @@ impl<'a> Parser<'a> {
 		}
 
 		tokens
+	}
+
+	fn lexems(data: &str) -> Vec<&str> {
+		let vec = Vec::new();
+		let open_brackets = [b'(', b'['];
+		let brackets = [b'(', b')', b'[', b']'];
+
+		let mut state = None;
+		for (i, b) in data.bytes().enumerate() {
+			match state {
+				Some(s) => {
+				},
+				None => {
+					if (open_brackets.contains(&b)) {
+						state = Some(b);
+					}
+				}
+			}
+		}
+		vec
 	}
 }
 
@@ -179,14 +207,6 @@ impl Iter<'_> {
 				Str(x) => {
 					out.push_str(x[self.count[i].start as usize]);
 					i += 1;
-				},
-				Var(n) => {
-					let j = self.count[*n].start as usize;
-					match &self.parser.map[self.parser.keys[*n] as usize] {
-						Ch(x) => { out.push(x[j] as char) },
-						Str(x) => {	out.push_str(x[j]) },
-						_ => {},
-					}
 				},
 				Out(x) => { out.push_str(x) },
 			}
@@ -239,6 +259,15 @@ impl Iterator for Iter<'_> {
 		self.count[0].start = u8::MAX;
 
 		Some(out)
+	}
+}
+
+pub fn request(mut args: impl Iterator<Item = String>) -> Result<String, &'static str> {
+	args.next();
+
+	match args.next() {
+		Some(req) if !req.is_empty() && req.is_ascii() => Ok(req),
+		_ => Err("Write something and don't forget about quotes please.")
 	}
 }
 
